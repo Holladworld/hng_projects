@@ -5,55 +5,74 @@ const { getCurrentTimestamp } = require('../utils/helpers');
 class ProfileController {
   constructor() {
     this.userProfile = {
-      email: process.env.USER_EMAIL,
-      name: process.env.USER_NAME,
-      stack: process.env.USER_STACK
+      email: process.env.USER_EMAIL || 'your-email@example.com',
+      name: process.env.USER_NAME || 'Your Full Name',
+      stack: process.env.USER_STACK || 'Node.js/Express'
     };
   }
 
   async getProfile(req, res, next) {
     try {
-      // Validate that user profile is configured
+      // Safe constant access
+      const RESPONSE_MESSAGES = constants?.RESPONSE_MESSAGES || {
+        SUCCESS: 'success',
+        ERROR: 'error', 
+        CAT_FACT_UNAVAILABLE: 'Unable to fetch cat fact',
+        SERVICE_UNAVAILABLE: 'Service unavailable'
+      };
+
+      const HTTP_STATUS = constants?.HTTP_STATUS || { OK: 200 };
+
+      // Safe timestamp
+      const timestamp = (typeof getCurrentTimestamp === 'function') 
+        ? getCurrentTimestamp() 
+        : new Date().toISOString();
+
+      // Safe profile check
       if (!this.isProfileConfigured()) {
         return res.status(500).json({
-          status: constants.RESPONSE_MESSAGES.ERROR,
+          status: RESPONSE_MESSAGES.ERROR,
           message: 'Server configuration incomplete'
         });
       }
 
-      const timestamp = getCurrentTimestamp();
       const catFactResult = await catFactService.getRandomFact();
 
       const response = {
-        status: constants.RESPONSE_MESSAGES.SUCCESS,
+        status: RESPONSE_MESSAGES.SUCCESS,
         user: { ...this.userProfile },
         timestamp: timestamp,
-        fact: catFactResult.success 
+        fact: catFactResult?.success 
           ? catFactResult.fact 
-          : constants.RESPONSE_MESSAGES.CAT_FACT_UNAVAILABLE
+          : RESPONSE_MESSAGES.CAT_FACT_UNAVAILABLE
       };
 
-      // Log successful request
-      req.log.info('Profile data fetched successfully', {
-        timestamp,
-        catFactSuccess: catFactResult.success
-      });
+      // Safe logging
+      if (req.log && typeof req.log.info === 'function') {
+        req.log.info('Profile data fetched successfully', {
+          timestamp,
+          catFactSuccess: catFactResult?.success
+        });
+      }
 
-      res.status(constants.HTTP_STATUS.OK).json(response);
+      res.status(HTTP_STATUS.OK || 200).json(response);
 
     } catch (error) {
-      // Log the error
-      req.log.error('Error in getProfile controller', { error: error.message });
+      console.error('Error in getProfile:', error);
       
-      // Fallback response to ensure endpoint always returns data
+      // Safe fallback with defaults
       const fallbackResponse = {
-        status: constants.RESPONSE_MESSAGES.SUCCESS,
-        user: { ...this.userProfile },
-        timestamp: getCurrentTimestamp(),
-        fact: constants.RESPONSE_MESSAGES.SERVICE_UNAVAILABLE
+        status: 'success',
+        user: { 
+          email: this.userProfile.email,
+          name: this.userProfile.name,
+          stack: this.userProfile.stack
+        },
+        timestamp: new Date().toISOString(),
+        fact: 'Unable to fetch cat fact at this time'
       };
 
-      res.status(constants.HTTP_STATUS.OK).json(fallbackResponse);
+      res.status(200).json(fallbackResponse);
     }
   }
 
@@ -61,11 +80,6 @@ class ProfileController {
     return this.userProfile.email && 
            this.userProfile.name && 
            this.userProfile.stack;
-  }
-
-  // Method to update profile (useful for testing)
-  updateProfile(newProfile) {
-    this.userProfile = { ...this.userProfile, ...newProfile };
   }
 }
 

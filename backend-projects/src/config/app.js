@@ -1,62 +1,40 @@
 const express = require('express');
 const cors = require('cors');
-// Remove helmet and rate-limit for now to simplify
-// const helmet = require('helmet');
-// const rateLimit = require('express-rate-limit');
-
 const profileRoutes = require('../routes/profileRoutes');
-const errorHandler = require('../middleware/errorHandler');
-const logger = require('../middleware/logger');
 
 const app = express();
 
-// Security middleware (commented out for now)
-// app.use(helmet());
-
-// Rate limiting (commented out for now)
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutes
-//   max: 100 // limit each IP to 100 requests per windowMs
-// });
-// app.use(limiter);
-
-// CORS configuration
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS || '*',
-  methods: ['GET']
-}));
-
-// Logging middleware
-app.use(logger);
-
-// Body parsing middleware
-app.use(express.json({ limit: '10kb' }));
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 // Routes
-app.use('/api', profileRoutes);
+app.use('/', profileRoutes);
 
-// Health check
+// Health check - SIMPLE VERSION
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Server is running',
+  res.status(200).json({ 
+    status: 'success', 
+    message: 'OK',
     timestamp: new Date().toISOString()
   });
 });
 
-// Profile endpoint at root level (as required by the task)
-app.use('/', profileRoutes);
-
-// 404 handler for unmatched routes - FIXED VERSION
-app.use((req, res, next) => {
+// 404 handler
+app.use((req, res) => {
   res.status(404).json({
     status: 'error',
-    message: 'Endpoint not found',
-    path: req.originalUrl
+    message: 'Not found'
   });
 });
 
-// Global error handler
-app.use(errorHandler);
+// Error handler
+app.use((error, req, res, next) => {
+  console.error('Error:', error);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error'
+  });
+});
 
 module.exports = app;
